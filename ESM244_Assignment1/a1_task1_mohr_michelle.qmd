@@ -1,0 +1,127 @@
+---
+title: "Assignment 1 Task 1"
+author: "Michelle D. Mohr"
+format: 
+  html: 
+    code-fold: show
+    toc: true
+    number-sections: true
+    embed-resources: true
+execute:
+  echo: true
+  message: false
+  warning: false
+editor: visual
+---
+
+# Task 1
+
+Dataset Knapp, R.A., C. Pavelka, E.E. Hegeman, and T.C. Smith. 2020. The Sierra Lakes Inventory Project: Non-Native fish and community composition of lakes and ponds in the Sierra Nevada, California ver 2. Environmental Data Initiative. https://doi.org/10.6073/pasta/d835832d7fd00d9e4466e44eea87fab3
+
+## Data wrangling and visualization (Sierra amphibians)
+
+1)  Read in .xlsx file and do some data wrangling
+2)  Create two data visualizations and put them together in a finalized compound figure
+
+### Task 1 Part 1
+
+A graph of total mountain yellow-legged frog (Rana muscosa) count each year across all water bodies, by life stage excluding the ‘EggMass’ level.
+
+Read in and wrangle the amphibian data
+```{r read in and wrangle the data}
+library(tidyverse)
+library(here)
+#install.packages("readxl")
+library(readxl)
+## read in the excel file ##
+sierra_amphibians <- read_excel("sierra_amphibians.xlsx")
+
+## data wrangling based on deliverables 
+### deliverable 1) graph of total mountain yellow- legged frog count each year across all water bodies, by life stage excluding the "EggMass' level 
+### deliverable 2) a column graph containing total counts (over all years of study) of combined adult and subadult endangered mountain yellow-legged frogs observed in the five lakes with the greatest total observed counts
+
+# first convert the date column to standard date 
+#install.packages("lubridate")
+library(lubridate)
+
+#change the survey_date column to a new column called date that is recognized as a date
+#extract the year
+#filter for RAMU
+sierra_amphibians_mylf <- sierra_amphibians %>%
+  mutate(date = lubridate::ymd(survey_date)) %>% 
+  mutate(year = lubridate::year(date)) %>%
+  filter(amphibian_species == 'RAMU')
+  
+#select specific columns to clean dataframe
+#group by life stage to be able to plot
+sierra_amphibians_mylf_count <- sierra_amphibians_mylf %>%
+  select(-survey_date) %>%
+    group_by(amphibian_life_stage)
+
+#take out EggMass life stage 
+mylf_count <- sierra_amphibians_mylf_count %>%
+  filter(amphibian_life_stage != "EggMass") %>%
+    group_by(amphibian_life_stage)
+
+#summarize counts per year by life stage
+summary_per_stage <- mylf_count %>%
+  group_by(year, amphibian_life_stage) %>%
+  summarize(total_amphibian_number = sum(amphibian_number))
+```
+
+Create a lifestage plot (excluding EggMass)
+```{r lifestage plot}
+lifestage_plot <- ggplot(data = summary_per_stage, aes(x = year, y = total_amphibian_number, fill = amphibian_life_stage)) + 
+  geom_bar(stat = "identity", position = "dodge") +  # Use geom_bar() with stat = "identity" to plot y values directly
+  theme_light() +
+  labs(
+    x = "Year",
+    y = "Count",
+    title = "Mountain Yellow Legged Frog Counts per Year",
+    caption = "Mountain Yellow Legged Frog (RAMU) counts per year by life stage"
+  ) +
+  scale_fill_discrete(name = "Amphibian Life Stage",
+                      labels = c("Adult", "Sub Adult", "Tadpole"))
+lifestage_plot
+```
+
+### Task 1 Part 2
+
+A column graph containing total counts (over all years of the study) of combined adult and subadult endangered mountain yellow-legged frogs (Rana muscosa) observed in the 5 lakes with the greatest total observed counts.
+
+```{r lake plot}
+mylf_lakes <- sierra_amphibians_mylf_count %>%
+  filter(amphibian_life_stage != "Tadpole") %>%
+  group_by(lake_id)%>%
+  summarize(total_amphibian_number = sum(amphibian_number)) %>% 
+  slice_max(total_amphibian_number, n=5)
+
+mylf_lakes <- mylf_lakes %>%
+  mutate(lake_id = recode(lake_id,
+                          "50183" = "Lake 50183",
+                          "10223" = "Lake 10223",
+                          "10329" = "Lake 10329",
+                          "20196" = "Lake 20196",
+                          "10225" = "Lake 10225"))
+
+mylf_lakes <- mylf_lakes %>%
+  mutate(lake_id = as.character(lake_id))
+
+lakeplot <- ggplot(data = mylf_lakes, aes(x = fct_reorder(lake_id, -total_amphibian_number),
+                              y = total_amphibian_number)) +
+  geom_col() + 
+  labs(x = "Lake", y = "Count",
+       caption = "Top five populations of combined adult and sub adult \nMountain Yellow Legged Frogs (RAMU) over all years of the study") +
+  ggtitle("Top 5 Lakes by Mountain Yellow Legged Frog Population") +
+  theme_light() 
+
+lakeplot
+```
+Combine the lifestage plot and the lake plot
+```{r patch the two plots together}
+library(patchwork)
+lifestage_lake <- lifestage_plot + lakeplot 
+lifestage_lake + 
+  plot_annotation(
+    caption = "Two plots showing population of Mountain Yellow Legged Frog by life stage over all years of the study and the lakes with the five highest populations.")
+```

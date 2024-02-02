@@ -1,0 +1,107 @@
+---
+title: "Assignment 1 Task 2"
+author: "Michelle D. Mohr"
+format: 
+  html: 
+    code-fold: show
+    toc: true
+    number-sections: true
+    embed-resources: true
+execute:
+  echo: true
+  message: false
+  warning: false
+editor: visual
+---
+
+# Task 2
+
+Dataset Knapp, R.A., C. Pavelka, E.E. Hegeman, and T.C. Smith. 2020. The Sierra Lakes Inventory Project: Non-Native fish and community composition of lakes and ponds in the Sierra Nevada, California ver 2. Environmental Data Initiative. https://doi.org/10.6073/pasta/d835832d7fd00d9e4466e44eea87fab3
+
+## Willamette Falls fish passage time series summary 
+
+1) Original time series
+2) Seasonplots
+3) Annual counts by species
+
+### Task 2 Part 1: Original time series
+
+A static graph of adult passage for coho, jack coho, and steelhead salmon.
+
+```{r read in data and wrangle}
+library(tidyverse)
+library(here)
+library(tsibble)
+library(feasts)
+library(fable)
+library(lubridate)
+willfalls <- read.csv('willamette_fish_passage.csv') %>%
+  janitor::clean_names() %>%
+  mutate(date = lubridate::ydm(date))
+  
+
+willfalls_ts <- willfalls %>%
+  select(date, steelhead, coho, jack_coho) %>%
+  mutate_at(vars(-date), ~ replace_na(., 0))
+
+# plot it 
+
+migration_ts <- ggplot(data = willfalls_ts, aes(x = date)) +
+  geom_line(aes(y = steelhead, color = "Steelhead")) +
+  geom_line(aes(y = coho, color = "Coho")) +
+  geom_line(aes(y = jack_coho, color = "Jack Coho")) +
+  labs(title = "Migration Time Series", caption = "Counts of adult Coho, Jack Coho, and Steelhead passage in Willamette Falls",
+       x = "Date",
+       y = "Fish Count",
+       color = "Species") +
+  theme_light()
+
+migration_ts
+```
+
+2 - 3 bullet points summarizing major patterns / notable trends in the salmon passage time series data
+
+- Steelhead seems to have a seasonal migration/passage. 
+- Steelhead populations drop in 2008 and do not seem to rebound.
+- Coho and Jack Coho populations increased when Steelhead populations declined.
+
+### Task 2 Part 2: Seasonplots
+
+A finalized seasonplot for each species (coho, jack coho, steelhead) in its own panel. 
+
+```{r wrangle season data}
+# I was trying different ways to change the months because when i would originally plot them the month_name was not in chronological order 
+
+willfalls_ts_season <- willfalls_ts %>%
+  mutate(date = lubridate::ymd(date)) %>%
+  mutate(month = lubridate::month(date)) %>%
+  mutate(month_name = factor(month.abb[month], levels = month.abb)) %>%
+  group_by(month_name, month) %>%
+  summarize(steelhead_cnt = sum(steelhead), coho_cnt = sum(coho), jack_coho_cnt = sum(jack_coho)) %>%
+  select(-month)
+
+#plotting it 
+
+season_plot_steelhead<- ggplot(data = willfalls_ts_season, aes(x = month_name, y = steelhead_cnt)) +
+  geom_line()+
+  labs(title = "Steelhead Seasonal Migration", caption = "Seasonal migration of adult Steelhead by counts through passage in Willamette Falls",
+       x = "Month",
+       y = "Fish Count") +
+  theme_light()
+
+season_plot_steelhead
+
+# when I plot it with geom_line the values don't show up 
+
+season_plot_steelhead<- ggplot(data = willfalls_ts_season, aes(x = month_name, y = steelhead_cnt)) +
+  geom_point()+
+  labs(title = "Steelhead Seasonal Migration", caption = "Seasonal migration of adult Steelhead by counts through passage in Willamette Falls",
+       x = "Month",
+       y = "Fish Count") +
+  theme_light()
+
+season_plot_steelhead
+
+# when I use geom_point they do, put the points don't connect and I still have the issue that the months are out of order - and what do I do about the NA values? 
+```
+
